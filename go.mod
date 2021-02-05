@@ -3,11 +3,9 @@ module code.cloudfoundry.org/eirini
 go 1.15
 
 replace (
+	code.cloudfoundry.org/eirinix => ../eirinix
 	github.com/coreos/bbolt => github.com/coreos/bbolt v1.3.0
 	google.golang.org/grpc => google.golang.org/grpc v1.29.1
-	k8s.io/api => k8s.io/api v0.19.2
-	k8s.io/client-go => k8s.io/client-go v0.19.2
-	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.6.4
 )
 
 require (
@@ -100,12 +98,11 @@ require (
 	k8s.io/api v0.20.2
 	k8s.io/apiextensions-apiserver v0.20.2 // indirect
 	k8s.io/apimachinery v0.20.2
-	k8s.io/client-go v1.5.1
+	k8s.io/client-go v0.20.2
 	k8s.io/code-generator v0.20.2
 	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.5.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20210113233702-8566a335510f // indirect
 	k8s.io/metrics v0.20.2
-	k8s.io/utils v0.0.0-20210111153108-fddb29f9d009 // indirect
 	sigs.k8s.io/controller-runtime v0.8.1
 )

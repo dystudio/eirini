@@ -12,7 +12,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"gomodules.xyz/jsonpatch/v2"
-	"k8s.io/api/admission/v1beta1"
+	"k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -51,8 +51,8 @@ var _ = Describe("InstanceIndexInjector", func() {
 		}
 
 		req = admission.Request{
-			AdmissionRequest: v1beta1.AdmissionRequest{
-				Operation: v1beta1.Create,
+			AdmissionRequest: v1.AdmissionRequest{
+				Operation: v1.Create,
 			},
 		}
 
@@ -89,7 +89,7 @@ var _ = Describe("InstanceIndexInjector", func() {
 	Context("the passed pod has already been created", func() {
 		When("operation is Update", func() {
 			BeforeEach(func() {
-				req.AdmissionRequest.Operation = v1beta1.Update
+				req.AdmissionRequest.Operation = v1.Update
 			})
 
 			It("allows the operation without interacting with the passed pod", func() {
@@ -100,7 +100,7 @@ var _ = Describe("InstanceIndexInjector", func() {
 
 		When("operation is Delete", func() {
 			BeforeEach(func() {
-				req.AdmissionRequest.Operation = v1beta1.Delete
+				req.AdmissionRequest.Operation = v1.Delete
 			})
 
 			It("allows the operation without interacting with the passed pod", func() {
@@ -111,7 +111,7 @@ var _ = Describe("InstanceIndexInjector", func() {
 
 		When("operation is Connect", func() {
 			BeforeEach(func() {
-				req.AdmissionRequest.Operation = v1beta1.Connect
+				req.AdmissionRequest.Operation = v1.Connect
 			})
 
 			It("allows the operation without interacting with the passed pod", func() {

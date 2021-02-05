@@ -90,7 +90,8 @@ type DefaultExtensionManager struct {
 	kubeConnection *rest.Config
 	kubeClient     corev1client.CoreV1Interface
 
-	stopChannel chan struct{}
+	ctx context.Context
+	cancel context.CancelFunc
 
 	watcher watch.Interface
 }
@@ -205,7 +206,8 @@ func NewManager(opts ManagerOptions) Manager {
 		opts.SetupCertificate = &setupCertificate
 	}
 
-	return &DefaultExtensionManager{Options: opts, Logger: opts.Logger, stopChannel: make(chan struct{})}
+	ctx, cancel := context.WithCancel(context.Background())
+	return &DefaultExtensionManager{Options: opts, Logger: opts.Logger, ctx: ctx, cancel: cancel}
 }
 
 // AddExtension adds an Eirini extension to the manager.
@@ -573,13 +575,13 @@ func (m *DefaultExtensionManager) Start() error {
 		return err
 	}
 
-	return m.KubeManager.Start(m.stopChannel)
+	return m.KubeManager.Start(m.ctx)
 }
 
 func (m *DefaultExtensionManager) Stop() {
 	defer m.Logger.Sync()
 
-	close(m.stopChannel)
+	m.cancel()
 	if m.watcher != nil {
 		m.watcher.Stop()
 	}

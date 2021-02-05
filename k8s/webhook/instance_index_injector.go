@@ -12,7 +12,7 @@ import (
 	eirinix "code.cloudfoundry.org/eirinix"
 	"code.cloudfoundry.org/lager"
 	exterrors "github.com/pkg/errors"
-	"k8s.io/api/admission/v1beta1"
+	"k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -32,7 +32,7 @@ func NewInstanceIndexEnvInjector(logger lager.Logger) InstanceIndexEnvInjector {
 func (i InstanceIndexEnvInjector) Handle(ctx context.Context, eiriniManager eirinix.Manager, pod *corev1.Pod, req admission.Request) admission.Response {
 	logger := i.logger.Session("handle-webhook-request")
 
-	if req.Operation != v1beta1.Create {
+	if req.Operation != v1.Create {
 		return admission.Allowed("pod was already created")
 	}
 

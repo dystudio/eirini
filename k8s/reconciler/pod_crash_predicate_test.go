@@ -24,7 +24,7 @@ var _ = Describe("PodCrashPredicate", func() {
 	})
 
 	It("rejects all Update calls without specified source type", func() {
-		p := corev1.Pod{
+		p := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
 					stset.LabelSourceType: "sic-mundus",
@@ -32,12 +32,12 @@ var _ = Describe("PodCrashPredicate", func() {
 			},
 		}
 		Expect(predicate.Update(event.UpdateEvent{
-			MetaNew: p.GetObjectMeta(),
+			ObjectNew: p,
 		})).To(BeFalse())
 	})
 
 	It("allows all Update calls with specified source type", func() {
-		p := corev1.Pod{
+		p := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
 					stset.LabelSourceType: "very-wow-much-awesome",
@@ -45,7 +45,7 @@ var _ = Describe("PodCrashPredicate", func() {
 			},
 		}
 		Expect(predicate.Update(event.UpdateEvent{
-			MetaNew: p.GetObjectMeta(),
+			ObjectNew: p,
 		})).To(BeTrue())
 	})
 })
