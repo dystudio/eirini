@@ -13,6 +13,8 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 type options struct {
@@ -51,8 +53,11 @@ func main() {
 		Namespace:           cfg.WorkloadsNamespace,
 	}
 
+	decoder, err := admission.NewDecoder(scheme.Scheme)
+	cmdcommons.ExitfIfError(err, "Failed to create decoder")
+
 	manager := eirinix.NewManager(managerOptions)
-	err = manager.AddExtension(webhook.NewInstanceIndexEnvInjector(log))
+	err = manager.AddExtension(webhook.NewInstanceIndexEnvInjector(log, decoder))
 	cmdcommons.ExitfIfError(err, "failed to add the instance index env injector extension")
 
 	if opts.RegisterOnly {

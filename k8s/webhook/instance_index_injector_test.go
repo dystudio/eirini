@@ -2,10 +2,10 @@ package webhook_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"code.cloudfoundry.org/eirini/k8s/webhook"
-	"code.cloudfoundry.org/eirini/k8s/webhook/webhookfakes"
 	eirinix "code.cloudfoundry.org/eirinix"
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/lager/lagertest"
@@ -15,23 +15,25 @@ import (
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 var _ = Describe("InstanceIndexInjector", func() {
 	var (
-		injector                 eirinix.Extension
-		manager                  *webhookfakes.FakeManager
-		logger                   lager.Logger
-		pod                      *corev1.Pod
-		req                      admission.Request
-		actualResp, expectedResp admission.Response
+		injector eirinix.Extension
+		logger   lager.Logger
+		pod      *corev1.Pod
+		req      admission.Request
+		resp     admission.Response
 	)
 
 	BeforeEach(func() {
-		manager = new(webhookfakes.FakeManager)
 		logger = lagertest.NewTestLogger("instance-index-injector")
-		injector = webhook.NewInstanceIndexEnvInjector(logger)
+		decoder, err := admission.NewDecoder(scheme.Scheme)
+		Expect(err).NotTo(HaveOccurred())
+		injector = webhook.NewInstanceIndexEnvInjector(logger, decoder)
 
 		pod = &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -50,40 +52,34 @@ var _ = Describe("InstanceIndexInjector", func() {
 			},
 		}
 
+		rawPod, err := json.Marshal(pod)
+		Expect(err).NotTo(HaveOccurred())
+
 		req = admission.Request{
 			AdmissionRequest: v1beta1.AdmissionRequest{
 				Operation: v1beta1.Create,
+				Object:    runtime.RawExtension{Raw: rawPod},
 			},
 		}
-
-		expectedResp = admission.Response{
-			Patches: []jsonpatch.JsonPatchOperation{
-				{Operation: "add", Path: "somewhere", Value: "something"},
-			},
-		}
-		manager.PatchFromPodReturns(expectedResp)
 	})
 
 	JustBeforeEach(func() {
-		actualResp = injector.Handle(context.Background(), manager, pod, req)
+		resp = injector.Handle(context.Background(), nil, nil, req)
 	})
 
 	It("injects the app instance as env variable in the container", func() {
-		Expect(actualResp).To(Equal(expectedResp))
-
-		Expect(manager.PatchFromPodCallCount()).To(Equal(1))
-
-		actualReq, actualPod := manager.PatchFromPodArgsForCall(0)
-		Expect(actualReq).To(Equal(req))
-		Expect(actualPod.Name).To(Equal("some-app-instance-3"))
-		Expect(actualPod.Spec.Containers).To(ConsistOf(corev1.Container{
-			Name: "opi",
-			Env: []corev1.EnvVar{
-				{Name: "FOO", Value: "foo"},
-				{Name: "BAR", Value: "bar"},
-				{Name: "CF_INSTANCE_INDEX", Value: "3"},
+		Expect(resp.Patches).To(Equal(
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env/2",
+					Value: map[string]interface{}{
+						"name":  "CF_INSTANCE_INDEX",
+						"value": "3",
+					},
+				},
 			},
-		}))
+		))
 	})
 
 	Context("the passed pod has already been created", func() {
@@ -93,8 +89,7 @@ var _ = Describe("InstanceIndexInjector", func() {
 			})
 
 			It("allows the operation without interacting with the passed pod", func() {
-				Expect(manager.PatchFromPodCallCount()).To(Equal(0))
-				ExpectAllowResponse(actualResp)
+				ExpectAllowResponse(resp)
 			})
 		})
 
@@ -104,8 +99,7 @@ var _ = Describe("InstanceIndexInjector", func() {
 			})
 
 			It("allows the operation without interacting with the passed pod", func() {
-				Expect(manager.PatchFromPodCallCount()).To(Equal(0))
-				ExpectAllowResponse(actualResp)
+				ExpectAllowResponse(resp)
 			})
 		})
 
@@ -115,31 +109,8 @@ var _ = Describe("InstanceIndexInjector", func() {
 			})
 
 			It("allows the operation without interacting with the passed pod", func() {
-				Expect(manager.PatchFromPodCallCount()).To(Equal(0))
-				ExpectAllowResponse(actualResp)
+				ExpectAllowResponse(resp)
 			})
-		})
-	})
-
-	Context("k8s hygiene", func() {
-		var podCopy *corev1.Pod
-
-		BeforeEach(func() {
-			podCopy = pod.DeepCopy()
-		})
-
-		It("does not mutate the passed pod", func() {
-			Expect(pod).To(Equal(podCopy))
-		})
-	})
-
-	When("no pod is passed to handle", func() {
-		BeforeEach(func() {
-			pod = nil
-		})
-
-		It("returns an error response", func() {
-			ExpectBadRequestErrorResponse(actualResp, "no pod could be decoded from the request")
 		})
 	})
 
@@ -149,7 +120,7 @@ var _ = Describe("InstanceIndexInjector", func() {
 		})
 
 		It("returns an error response", func() {
-			ExpectBadRequestErrorResponse(actualResp, "could not parse app name")
+			ExpectBadRequestErrorResponse(resp, "could not parse app name")
 		})
 	})
 
@@ -159,7 +130,7 @@ var _ = Describe("InstanceIndexInjector", func() {
 		})
 
 		It("returns an error response", func() {
-			ExpectBadRequestErrorResponse(actualResp, "could not parse app name")
+			ExpectBadRequestErrorResponse(resp, "could not parse app name")
 		})
 	})
 
@@ -169,7 +140,7 @@ var _ = Describe("InstanceIndexInjector", func() {
 		})
 
 		It("returns an error response", func() {
-			ExpectBadRequestErrorResponse(actualResp, "pod my-instance-four name does not contain an index")
+			ExpectBadRequestErrorResponse(resp, "pod my-instance-four name does not contain an index")
 		})
 	})
 
@@ -179,7 +150,7 @@ var _ = Describe("InstanceIndexInjector", func() {
 		})
 
 		It("returns an error response", func() {
-			ExpectBadRequestErrorResponse(actualResp, "pod my-instance- name does not contain an index")
+			ExpectBadRequestErrorResponse(resp, "pod my-instance- name does not contain an index")
 		})
 	})
 
@@ -189,7 +160,7 @@ var _ = Describe("InstanceIndexInjector", func() {
 		})
 
 		It("returns an error response", func() {
-			ExpectBadRequestErrorResponse(actualResp, "no opi container found in pod")
+			ExpectBadRequestErrorResponse(resp, "no opi container found in pod")
 		})
 	})
 })
